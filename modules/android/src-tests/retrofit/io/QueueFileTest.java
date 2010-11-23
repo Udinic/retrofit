@@ -134,7 +134,7 @@ public class QueueFileTest extends TestCase {
     queueFile.close();
 
     final BrokenRandomAccessFile braf = new BrokenRandomAccessFile(file, "rwd");
-    queueFile = new QueueFile(braf);
+    queueFile = new QueueFile(file, braf);
 
     try {
       queueFile.add(values[252]);
@@ -161,7 +161,7 @@ public class QueueFileTest extends TestCase {
     queueFile.close();
 
     final BrokenRandomAccessFile braf = new BrokenRandomAccessFile(file, "rwd");
-    queueFile = new QueueFile(braf);
+    queueFile = new QueueFile(file, braf);
 
     try {
       queueFile.remove();
@@ -185,7 +185,7 @@ public class QueueFileTest extends TestCase {
     queueFile.close();
 
     final BrokenRandomAccessFile braf = new BrokenRandomAccessFile(file, "rwd");
-    queueFile = new QueueFile(braf);
+    queueFile = new QueueFile(file, braf);
 
     try {
       // This should trigger an expansion which should fail.
@@ -193,7 +193,7 @@ public class QueueFileTest extends TestCase {
       fail();
     } catch (IOException e) { /* expected */ }
 
-    queueFile.close();
+//    queueFile.close();
 
     queueFile = new QueueFile(file);
 

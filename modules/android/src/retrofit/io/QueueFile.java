@@ -49,8 +49,11 @@ public class QueueFile {
   private static final Logger logger =
       Logger.getLogger(QueueFile.class.getName());
 
+  /** Typical size of a block in the file system. Used for alignment. */
+  private static final int BLOCK_SIZE = 4096;
+
   /** Initial file size in bytes. */
-  private static final int INITIAL_LENGTH = 4096; // one file system block
+  private static final int INITIAL_LENGTH = BLOCK_SIZE; // one file system block
 
   /** Length of header in bytes. */
   static final int HEADER_LENGTH = 16;
@@ -80,6 +83,8 @@ public class QueueFile {
    *     Data   (Length bytes)
    * </pre>
    */
+  private final File file;
+
   private final RandomAccessFile raf;
 
   /** Cached file length. Always a power of 2. */
@@ -103,13 +108,15 @@ public class QueueFile {
    */
   public QueueFile(File file) throws IOException {
     if (!file.exists()) initialize(file);
+    this.file = file;
     raf = open(file);
     readHeader();
   }
 
   /** For testing. */
-  QueueFile(RandomAccessFile raf) throws IOException {
+  QueueFile(File file, RandomAccessFile raf) throws IOException {
     this.raf = raf;
+    this.file = file;
     readHeader();
   }
 
@@ -353,7 +360,7 @@ public class QueueFile {
       newLength = previousLength << 1;
       previousLength = newLength;
     } while (remainingBytes < elementLength);
-    raf.setLength(newLength);
+    expandTo(newLength);
 
     // Calculate the position of the tail end of the data in the ring buffer
     int endOfLastElement = wrapPosition(
@@ -379,6 +386,42 @@ public class QueueFile {
     }
 
     fileLength = newLength;
+  }
+
+  /**
+   * Expands the file to the given length.
+   */
+  private void expandTo(int newLength) throws IOException {
+    /*
+     * RandomAccessFile.setLength() can fail silently when expanding on YAFFS,
+     * so we expand the file by appending to it. Since setLength() zeroes out
+     * the new section (on Linux), the performance is about the same.
+     *
+     * Use RAF.length() to get the initial length, not File.length(). On
+     * YAFFS, File.length() seems to return the wrong value (0) if the file
+     * was previously expanded with RAF.setLength().
+     */
+    long length = raf.length();
+    FileOutputStream out = new FileOutputStream(file, true);
+    boolean successful = false;
+    try {
+      byte[] zeroes = new byte[BLOCK_SIZE];
+      while (length < newLength) {
+        // Throws an IOException if we exceed the filesystem capacity.
+        out.write(zeroes);
+        length += zeroes.length;
+      }
+      out.getChannel().force(false); // just in case
+      successful = true;
+    } finally {
+      out.close();
+
+      /*
+       * If the operation failed, truncate the file back to the expected
+       * length.
+       */
+      if (!successful) raf.setLength(this.fileLength);
+    }
   }
 
   /** Reads the eldest element. Returns null if the queue is empty. */
