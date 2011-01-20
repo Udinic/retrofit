@@ -68,9 +68,10 @@ import java.util.logging.Logger;
    * Adapts a Java interface to a REST API. HTTP requests happen in a
    * background thread. Callbacks happen in the UI thread.
    *
-   * <p>Gets the relative path for a given method from a {@link Path}
-   * annotation on the method. Gets the names of URL parameters from {@link
-   * com.google.inject.name.Named} annotations on the method parameters.
+   * <p>Gets the relative path for a given method from a {@link GET} or
+   * {@link POST} annotation on the method. Gets the names of URL parameters
+   * from {@link com.google.inject.name.Named} annotations on the method
+   * parameters.
    *
    * <p>The last method parameter should be of type {@link Callback}. The
    * JSON HTTP response will be converted to the callback's parameter type
@@ -81,7 +82,7 @@ import java.util.logging.Logger;
    *
    * <pre>
    *   public interface MyApi {
-   *     &#64;Path("go") public void go(@Named("a") String a, @Named("b") int b,
+   *     &#64;POST("go") public void go(@Named("a") String a, @Named("b") int b,
    *         Callback&lt;? super MyResult> callback);
    *   }
    * </pre>
@@ -105,69 +106,113 @@ import java.util.logging.Logger;
     };
   }
 
-  private class RestHandler implements InvocationHandler {
+  private static interface MethodAnnotationHandler {
+    void isGet(String path);
+    void isPost(String path);
+  }
 
-    public Object invoke(Object proxy, final Method method,
-        final Object[] args) {
-      // Execute HTTP request in the background.
-      executor.execute(new Runnable() {
-        @SuppressWarnings("unchecked")
-        public void run() {
-          backgroundInvoke(method, args);
+  private static void readHttpMethodAnnotation(Method method,
+      MethodAnnotationHandler handler) {
+
+    GET getAnnotation = method.getAnnotation(GET.class);
+    boolean hasGet = getAnnotation != null;
+
+    POST postAnnotation = method.getAnnotation(POST.class);
+    boolean hasPost = postAnnotation != null;
+
+    if (hasGet && hasPost) {
+      throw new IllegalArgumentException(
+          "Method annotated has both GET and POST: " + method.getName());
+    }
+
+    if (hasGet) {
+      handler.isGet(getAnnotation.value());
+    } else if (hasPost) {
+      handler.isPost(postAnnotation.value());
+    } else {
+      throw new IllegalArgumentException(
+          "Method not annotated with GET or POST: " + method.getName());
+    }
+  }
+
+  /**
+   * Builds HTTP requests from Java method invocations.
+   */
+  private static final class HttpRequestBuilder {
+
+    private static enum HttpMethod {GET, POST}
+
+    private Method javaMethod;
+    private Object[] args;
+    private HttpMethod httpMethod;
+    private String apiUrl;
+    private String relativePath;
+
+    public HttpRequestBuilder setMethod(Method method) {
+
+      this.javaMethod = method;
+
+      readHttpMethodAnnotation(method, new MethodAnnotationHandler() {
+        public void isGet(String path) {
+          httpMethod = HttpMethod.GET;
+          relativePath = path;
+        }
+        public void isPost(String path) {
+          httpMethod = HttpMethod.POST;
+          relativePath = path;
         }
       });
 
-      // Methods should return void.
-      return null;
+      return this;
     }
 
-    private void backgroundInvoke(Method method, Object[] args) {
-      UiCallback<?> callback = UiCallback.create(
-          (Callback<?>) args[args.length - 1], mainThread);
+    public HttpRequestBuilder setApiUrl(String apiUrl) {
+      this.apiUrl = apiUrl;
+      return this;
+    }
 
-      try {
-        String relativePath = getRelativePath(method);
-        final String apiUrl = server.apiUrl();
+    /** The last argument is assumed to be the Callback and is ignored. */
+    public HttpRequestBuilder setArgs(Object[] args) {
+      this.args = args;
+      return this;
+    }
 
-        // Construct HTTP request.
-        HttpUriRequest request;
-        HttpMethod.Type requestType = getRequestType(method);
-        switch (requestType) {
-          case GET:
-            request = createGet(apiUrl, relativePath, method, args);
-            break;
-          case POST:
-            request = createPost(apiUrl, relativePath, method, args);
-            break;
-          default:
-            throw new IllegalStateException(
-                "Unrecognized HTTP Method: " + requestType);
-        }
-        headers.setHeaders(request);
-
-        // The last parameter should be of type Callback<T>. Determine T.
-        Type[] genericParameterTypes = method.getGenericParameterTypes();
-        final Type resultType = getCallbackParameterType(method,
-            genericParameterTypes);
-        logger.fine(String.format("Sending " + requestType + " request to %s.",
-            request.getURI()));
-
-        final GsonResponseHandler<?> gsonResponseHandler =
-            GsonResponseHandler.create(resultType, callback);
-
-        // Optionally wrap the response handler for server call profiling.
-        ResponseHandler<? extends Void> rh = (profiler == null)
-            ? gsonResponseHandler
-            : new ProfilingResponseHandler(gsonResponseHandler, profiler,
-                HttpProfiler.Method.POST, apiUrl, relativePath);
-
-        httpClientProvider.get().execute(request, rh);
-      } catch (IOException e) {
-        logger.log(Level.WARNING, e.getMessage(), e);
-        callback.networkError();
-      } catch (Throwable t) {
-        callback.unexpectedError(t);
+    public HttpUriRequest build() throws URISyntaxException {
+      switch (httpMethod) {
+        case GET: return createGet();
+        case POST: return createPost();
+        default: throw new IllegalArgumentException(
+            "Unrecognized HttpRequest type: " + httpMethod);
       }
+    }
+
+    private HttpGet createGet() throws URISyntaxException {
+
+      List<NameValuePair> queryParams = createParamList(javaMethod, args);
+      String queryString = URLEncodedUtils.format(queryParams, "UTF-8");
+
+      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
+          relativePath, queryString, null);
+      return new HttpGet(uri);
+    }
+
+    private HttpPost createPost() throws URISyntaxException {
+      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
+          relativePath, null, null);
+      HttpPost post = new HttpPost(uri);
+      addParamsToPost(post, javaMethod, args);
+      return post;
+    }
+
+    private String scheme(String apiUrl) {
+      return apiUrl.substring(0, apiUrl.indexOf("://"));
+    }
+
+    private String host(String apiUrl) {
+      String host = apiUrl.substring(
+          apiUrl.indexOf("://") + 3, apiUrl.length());
+      if (host.endsWith("/")) host = host.substring(0, host.length() - 1);
+      return host;
     }
 
     /**
@@ -190,40 +235,7 @@ import java.util.logging.Logger;
       return params;
     }
 
-    private HttpGet createGet(String apiUrl, String relativePath,
-        Method method, Object[] args) throws URISyntaxException {
-
-      List<NameValuePair> queryParams = createParamList(method, args);
-      String queryString = URLEncodedUtils.format(queryParams, "UTF-8");
-
-      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
-          relativePath, queryString, null);
-      return new HttpGet(uri);
-    }
-
-    private HttpPost createPost(String apiUrl, String relativePath,
-        Method method, Object[] args) throws URISyntaxException {
-      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
-          relativePath, null, null);
-      HttpPost post = new HttpPost(uri);
-      addParamsToPost(post, method, args);
-      return post;
-    }
-
-    private String scheme(String apiUrl) {
-      return apiUrl.substring(0, apiUrl.indexOf("://"));
-    }
-
-    private String host(String apiUrl) {
-      String host = apiUrl.substring(
-          apiUrl.indexOf("://") + 3, apiUrl.length());
-      if (host.endsWith("/")) host = host.substring(0, host.length() - 1);
-      return host;
-    }
-
     private void addParamsToPost(HttpPost post, Method method, Object[] args) {
-
-      // Convert all but the last method argument to HTTP request parameters.
 
       Class<?>[] parameterTypes = method.getParameterTypes();
 
@@ -270,6 +282,108 @@ import java.util.logging.Logger;
       return false;
     }
 
+    /** Gets the parameter name from the @Named annotation. */
+    private String getName(Annotation[] annotations, Method method,
+        int parameterIndex) {
+      return findAnnotation(annotations, Named.class, method,
+          parameterIndex).value();
+    }
+
+    /**
+     * Finds a parameter annotation.
+     *
+     * @throws IllegalArgumentException if the annotation isn't found
+     */
+    private <A extends Annotation> A findAnnotation(Annotation[] annotations,
+        Class<A> annotationType, Method method, int parameterIndex) {
+      for (Annotation annotation : annotations) {
+        if (annotation.annotationType() == annotationType) {
+          return annotationType.cast(annotation);
+        }
+      }
+      throw new IllegalArgumentException(annotationType + " missing on"
+          + " parameter #" + parameterIndex + " of " + method + ".");
+    }
+  }
+
+  private class RestHandler implements InvocationHandler {
+
+    public Object invoke(Object proxy, final Method method,
+        final Object[] args) {
+      // Execute HTTP request in the background.
+      executor.execute(new Runnable() {
+        @SuppressWarnings("unchecked")
+        public void run() {
+          backgroundInvoke(method, args);
+        }
+      });
+
+      // Methods should return void.
+      return null;
+    }
+
+    private void backgroundInvoke(Method method, Object[] args) {
+      UiCallback<?> callback = UiCallback.create(
+          (Callback<?>) args[args.length - 1], mainThread);
+
+      try {
+
+        // Construct HTTP request.
+        HttpUriRequest request = new HttpRequestBuilder()
+            .setApiUrl(server.apiUrl())
+            .setMethod(method)
+            .setArgs(args)
+            .build();
+        headers.setHeaders(request);
+
+        // The last parameter should be of type Callback<T>. Determine T.
+        Type[] genericParameterTypes = method.getGenericParameterTypes();
+        final Type resultType = getCallbackParameterType(method,
+            genericParameterTypes);
+        logger.fine("Sending " + request.getMethod() + " to " +
+            request.getURI());
+
+        final GsonResponseHandler<?> gsonResponseHandler =
+            GsonResponseHandler.create(resultType, callback);
+
+        // Optionally wrap the response handler for server call profiling.
+        ResponseHandler<? extends Void> rh = (profiler == null) ?
+            gsonResponseHandler : createProfiler(gsonResponseHandler, profiler,
+                method, server.apiUrl());
+
+        httpClientProvider.get().execute(request, rh);
+      } catch (IOException e) {
+        logger.log(Level.WARNING, e.getMessage(), e);
+        callback.networkError();
+      } catch (Throwable t) {
+        callback.unexpectedError(t);
+      }
+    }
+
+    /** Wraps a {@code GsonResponseHandler} with an {@code HttpProfiler}. */
+    public ProfilingResponseHandler createProfiler(
+        GsonResponseHandler<?> handlerToWrap, HttpProfiler profiler,
+        Method method, String apiUrl) {
+
+      final HttpProfiler.Method[] profilerMethod = new HttpProfiler.Method[1];
+      final String[] relativePath = new String[1];
+
+      readHttpMethodAnnotation(method, new MethodAnnotationHandler() {
+        public void isGet(String path) {
+          profilerMethod[0] = HttpProfiler.Method.GET;
+          relativePath[0] = path;
+        }
+
+        public void isPost(String path) {
+          profilerMethod[0] = HttpProfiler.Method.POST;
+          relativePath[0] = path;
+        }
+      });
+
+      return new ProfilingResponseHandler(handlerToWrap, profiler,
+          profilerMethod[0], apiUrl, relativePath[0]);
+    }
+
     private static final String NOT_CALLBACK = "Last parameter of %s must be"
         + " of type Callback<X> or Callback<? super X>.";
 
@@ -307,47 +421,6 @@ import java.util.logging.Logger;
 
     private IllegalArgumentException notCallback(Method method) {
       return new IllegalArgumentException(String.format(NOT_CALLBACK, method));
-    }
-
-    /** Gets the parameter name from the @Named annotation. */
-    private String getName(Annotation[] annotations, Method method,
-        int parameterIndex) {
-      return findAnnotation(annotations, Named.class, method,
-          parameterIndex).value();
-    }
-
-    /**
-     * Finds a parameter annotation.
-     *
-     * @throws IllegalArgumentException if the annotation isn't found
-     */
-    private <A extends Annotation> A findAnnotation(Annotation[] annotations,
-        Class<A> annotationType, Method method, int parameterIndex) {
-      for (Annotation annotation : annotations) {
-        if (annotation.annotationType() == annotationType) {
-          return annotationType.cast(annotation);
-        }
-      }
-      throw new IllegalArgumentException(annotationType + " missing on"
-          + " parameter #" + parameterIndex + " of " + method + ".");
-    }
-
-
-    /** Gets the relative path from the @Path annotation. */
-    private String getRelativePath(Method method) {
-      Path pathAnnotation = method.getAnnotation(Path.class);
-      if (pathAnnotation == null) throw new IllegalArgumentException(method
-          + " is missing an @Path annotation.");
-      return pathAnnotation.value();
-    }
-
-    private HttpMethod.Type getRequestType(Method method) {
-      HttpMethod requestTypeAnnotation = method.getAnnotation(
-          HttpMethod.class);
-
-      // Default to POST.
-      return requestTypeAnnotation == null ? HttpMethod.Type.POST :
-          requestTypeAnnotation.value();
     }
 
   }
