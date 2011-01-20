@@ -122,7 +122,7 @@ import java.util.logging.Logger;
 
     if (hasGet && hasPost) {
       throw new IllegalArgumentException(
-          "Method annotated has both GET and POST: " + method.getName());
+          "Method annotated with both GET and POST: " + method.getName());
     }
 
     if (hasGet) {
