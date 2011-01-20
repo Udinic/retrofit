@@ -131,7 +131,7 @@ import java.util.logging.Logger;
 
         // Construct HTTP request.
         HttpUriRequest request;
-        RequestMethod.Type requestType = getRequestType(method);
+        HttpMethod.Type requestType = getRequestType(method);
         switch (requestType) {
           case GET:
             request = createGet(apiUrl, relativePath, method, args);
@@ -141,7 +141,7 @@ import java.util.logging.Logger;
             break;
           default:
             throw new IllegalStateException(
-                "Unrecognized HTTP Method: " + this);
+                "Unrecognized HTTP Method: " + requestType);
         }
         headers.setHeaders(request);
 
@@ -192,18 +192,33 @@ import java.util.logging.Logger;
 
     private HttpGet createGet(String apiUrl, String relativePath,
         Method method, Object[] args) throws URISyntaxException {
+
       List<NameValuePair> queryParams = createParamList(method, args);
-      URI uri = URIUtils.createURI("http", apiUrl, -1, relativePath,
-          URLEncodedUtils.format(queryParams, "UTF-8"), null);
+      String queryString = URLEncodedUtils.format(queryParams, "UTF-8");
+
+      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
+          relativePath, queryString, null);
       return new HttpGet(uri);
     }
 
     private HttpPost createPost(String apiUrl, String relativePath,
         Method method, Object[] args) throws URISyntaxException {
-      URI uri = URIUtils.createURI("http", apiUrl, -1, relativePath, "", null);
+      URI uri = URIUtils.createURI(scheme(apiUrl), host(apiUrl), -1,
+          relativePath, null, null);
       HttpPost post = new HttpPost(uri);
       addParamsToPost(post, method, args);
       return post;
+    }
+
+    private String scheme(String apiUrl) {
+      return apiUrl.substring(0, apiUrl.indexOf("://"));
+    }
+
+    private String host(String apiUrl) {
+      String host = apiUrl.substring(
+          apiUrl.indexOf("://") + 3, apiUrl.length());
+      if (host.endsWith("/")) host = host.substring(0, host.length() - 1);
+      return host;
     }
 
     private void addParamsToPost(HttpPost post, Method method, Object[] args) {
@@ -318,21 +333,26 @@ import java.util.logging.Logger;
     }
 
 
-    /** Gets the relative path from the @Path annotation. */
+    /**
+     * Gets the relative path from the @Path annotation. Starts with a
+     * leading '/'.
+     */
     private String getRelativePath(Method method) {
       Path pathAnnotation = method.getAnnotation(Path.class);
       if (pathAnnotation == null) throw new IllegalArgumentException(method
           + " is missing an @Path annotation.");
-      return pathAnnotation.value();
+      String path = pathAnnotation.value();
+//      return path.startsWith("/") ? path : "/" + path;
+      return path;
     }
 
-    private RequestMethod.Type getRequestType(Method method) {
-      RequestMethod requestTypeAnnotation = method.getAnnotation(
-          RequestMethod.class);
+    private HttpMethod.Type getRequestType(Method method) {
+      HttpMethod requestTypeAnnotation = method.getAnnotation(
+          HttpMethod.class);
 
       // Default to POST.
-      return requestTypeAnnotation == null ? RequestMethod.Type.POST :
-          requestTypeAnnotation.getType();
+      return requestTypeAnnotation == null ? HttpMethod.Type.POST :
+          requestTypeAnnotation.value();
     }
 
   }

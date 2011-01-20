@@ -13,7 +13,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Target({ METHOD })
 @Retention(RUNTIME)
-public @interface RequestMethod {
+public @interface HttpMethod {
   enum Type {GET, POST}
-  Type getType();
+  Type value();
+
 }
