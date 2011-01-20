@@ -149,7 +149,7 @@ import java.util.logging.Logger;
         Type[] genericParameterTypes = method.getGenericParameterTypes();
         final Type resultType = getCallbackParameterType(method,
             genericParameterTypes);
-        logger.fine(String.format(requestType + "ing to %s.",
+        logger.fine(String.format("Sending " + requestType + " request to %s.",
             request.getURI()));
 
         final GsonResponseHandler<?> gsonResponseHandler =
