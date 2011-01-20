@@ -215,7 +215,6 @@ import java.util.logging.Logger;
      * parameters.
      */
     private List<NameValuePair> createParamList(Method method, Object[] args) {
-
       Annotation[][] parameterAnnotations = method.getParameterAnnotations();
       int count = parameterAnnotations.length - 1;
 
