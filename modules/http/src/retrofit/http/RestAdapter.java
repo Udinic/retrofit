@@ -333,17 +333,12 @@ import java.util.logging.Logger;
     }
 
 
-    /**
-     * Gets the relative path from the @Path annotation. Starts with a
-     * leading '/'.
-     */
+    /** Gets the relative path from the @Path annotation. */
     private String getRelativePath(Method method) {
       Path pathAnnotation = method.getAnnotation(Path.class);
       if (pathAnnotation == null) throw new IllegalArgumentException(method
           + " is missing an @Path annotation.");
-      String path = pathAnnotation.value();
-//      return path.startsWith("/") ? path : "/" + path;
-      return path;
+      return pathAnnotation.value();
     }
 
     private HttpMethod.Type getRequestType(Method method) {

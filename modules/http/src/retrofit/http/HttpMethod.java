@@ -16,5 +16,4 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface HttpMethod {
   enum Type {GET, POST}
   Type value();
-
 }
