@@ -113,7 +113,6 @@ import java.util.logging.Logger;
 
   private static void readHttpMethodAnnotation(Method method,
       MethodAnnotationHandler handler) {
-
     GET getAnnotation = method.getAnnotation(GET.class);
     boolean hasGet = getAnnotation != null;
 
@@ -149,9 +148,7 @@ import java.util.logging.Logger;
     private String relativePath;
 
     public HttpRequestBuilder setMethod(Method method) {
-
       this.javaMethod = method;
-
       readHttpMethodAnnotation(method, new MethodAnnotationHandler() {
         public void isGet(String path) {
           httpMethod = HttpMethod.GET;
@@ -162,7 +159,6 @@ import java.util.logging.Logger;
           relativePath = path;
         }
       });
-
       return this;
     }
 
@@ -187,7 +183,6 @@ import java.util.logging.Logger;
     }
 
     private HttpGet createGet() throws URISyntaxException {
-
       List<NameValuePair> queryParams = createParamList(javaMethod, args);
       String queryString = URLEncodedUtils.format(queryParams, "UTF-8");
 
@@ -235,8 +230,10 @@ import java.util.logging.Logger;
       return params;
     }
 
+    /**
+     * Adds all but the last method argument as parameters of HTTP post object.
+     */
     private void addParamsToPost(HttpPost post, Method method, Object[] args) {
-
       Class<?>[] parameterTypes = method.getParameterTypes();
 
       Annotation[][] parameterAnnotations = method.getParameterAnnotations();
