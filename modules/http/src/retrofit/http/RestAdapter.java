@@ -360,7 +360,10 @@ import java.util.logging.Logger;
       }
     }
 
-    /** Wraps a {@code GsonResponseHandler} with an {@code HttpProfiler}. */
+    /**
+     * Wraps a {@code GsonResponseHandler} with a
+     * {@code ProfilingResponseHandler}.
+     */
     public ProfilingResponseHandler createProfiler(
         GsonResponseHandler<?> handlerToWrap, HttpProfiler profiler,
         Method method, String apiUrl) {
@@ -373,7 +376,6 @@ import java.util.logging.Logger;
           profilerMethod[0] = HttpProfiler.Method.GET;
           relativePath[0] = path;
         }
-
         public void isPost(String path) {
           profilerMethod[0] = HttpProfiler.Method.POST;
           relativePath[0] = path;
