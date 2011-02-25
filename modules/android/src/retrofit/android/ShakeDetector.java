@@ -22,7 +22,7 @@ public class ShakeDetector implements SensorEventListener {
    * When the magnitude of total acceleration exceeds this
    * value, the phone is accelerating.
    */
-  private static final int ACCELERATION_THRESHOLD = 2;
+  private static final int ACCELERATION_THRESHOLD = 1;
 
   /** Listens for shakes. */
   public interface Listener {
