@@ -1,12 +1,72 @@
 // Copyright 2010 Square, Inc.
 package retrofit.android;
 
-import junit.framework.TestCase;
-
+import android.hardware.SensorEvent;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import junit.framework.TestCase;
 
 /** @author Eric Burke (eric@squareup.com) */
 public class ShakeDetectorTest extends TestCase {
+  public void testBadAccelerometerAtRest() {
+    final AtomicBoolean heardShake = new AtomicBoolean();
+    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
+      @Override public void hearShake() {
+        heardShake.set(true);
+      }
+    });
+
+    SensorEvent event = new SensorEvent(3);
+    event.values[0] = 10.11f;
+    event.values[1] =  0.08f;
+    event.values[2] = 18.34f;
+
+    for (int i = 0; i < 200; i++) {
+      event.timestamp = i * 10000000;
+      detector.onSensorChanged(event);
+    }
+
+    assertFalse("should not have heard shake", heardShake.get());
+
+  }
+
+  public void testBadAccelerometerShaking() {
+    final AtomicBoolean heardShake = new AtomicBoolean();
+    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
+      @Override public void hearShake() {
+        heardShake.set(true);
+      }
+    });
+
+    SensorEvent event = new SensorEvent(3);
+    event.values[0] = 10.11f;
+    event.values[1] =  0.08f;
+    event.values[2] = 18.34f;
+
+    for (int i = 0; i < 200; i++) {
+      event.timestamp = i * 10000000;
+
+      switch (i % 4) {
+        case 0:
+          event.values[0] = 10.11f;
+          break;
+        case 1:
+          event.values[0] = 0.11f;
+          break;
+        case 2:
+          event.values[0] = 18.11f;
+          break;
+        case 3:
+          event.values[0] = 28.11f;
+          break;
+      }
+      detector.onSensorChanged(event);
+    }
+
+    assertTrue("should have heard shake", heardShake.get());
+
+  }
+
   public void testInitialShaking() {
     ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
     assertFalse("shaking", q.isShaking());

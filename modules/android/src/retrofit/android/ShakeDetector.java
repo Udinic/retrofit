@@ -5,7 +5,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +22,7 @@ public class ShakeDetector implements SensorEventListener {
    * When the magnitude of total acceleration exceeds this
    * value, the phone is accelerating.
    */
-  private static final int ACCELERATION_THRESHOLD = 13;
+  private static final int ACCELERATION_THRESHOLD = 4;
 
   /** Listens for shakes. */
   public interface Listener {
@@ -36,6 +35,7 @@ public class ShakeDetector implements SensorEventListener {
 
   private SensorManager sensorManager;
   private Sensor accelerometer;
+  private double lastMagnitude;
 
   public ShakeDetector(Listener listener) {
     this.listener = listener;
@@ -88,7 +88,9 @@ public class ShakeDetector implements SensorEventListener {
     float az = event.values[2];
 
     final double magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
-    return magnitude > ACCELERATION_THRESHOLD;
+    boolean accelerating = Math.abs(magnitude - lastMagnitude) > ACCELERATION_THRESHOLD;
+    lastMagnitude = magnitude;
+    return accelerating;
   }
 
   /** Queue of samples. Keeps a running average. */
