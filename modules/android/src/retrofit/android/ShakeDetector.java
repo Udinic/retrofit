@@ -88,6 +88,7 @@ public class ShakeDetector implements SensorEventListener {
     float az = event.values[2];
 
     final double magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
+//    System.out.println("magnitude is "+magnitude);
     boolean accelerating = Math.abs(magnitude - lastMagnitude) > ACCELERATION_THRESHOLD;
     lastMagnitude = magnitude;
     return accelerating;
@@ -105,7 +106,7 @@ public class ShakeDetector implements SensorEventListener {
      * fails to deliver this many events during the time window. The LG Ally
      * is one such device.
      */
-    private static final int MIN_QUEUE_SIZE = 4;
+    private static final int MIN_QUEUE_SIZE = 8;
 
     private final SamplePool pool = new SamplePool();
 
@@ -186,7 +187,8 @@ public class ShakeDetector implements SensorEventListener {
       return newest != null
           && oldest != null
           && newest.timestamp - oldest.timestamp >= MIN_WINDOW_SIZE
-          && acceleratingCount >= (sampleCount >> 1) + (sampleCount >> 2);
+          && (acceleratingCount << 2) >= ((sampleCount) + (sampleCount << 1))
+          ;
     }
   }
 
@@ -225,6 +227,7 @@ public class ShakeDetector implements SensorEventListener {
     }
   }
 
-  public void onAccuracyChanged(Sensor sensor, int accuracy) {
+  @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {
   }
 }
+

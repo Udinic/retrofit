@@ -64,7 +64,72 @@ public class ShakeDetectorTest extends TestCase {
     }
 
     assertTrue("should have heard shake", heardShake.get());
+  }
 
+  /** small queue size currently yields incorrect 75% calculation */
+  public void testLowRefreshRateFalseShake_QueueSizeFour() {
+    final AtomicBoolean heardShake = new AtomicBoolean(false);
+    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
+      @Override public void hearShake() {
+        heardShake.set(true);
+      }
+    });
+
+    SensorEvent event = new SensorEvent(3);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, 100);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 100);
+
+    // This is not an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 100);
+
+    // This is not an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 100);
+
+    assertFalse("should not have heard shake", heardShake.get());
+
+  }
+
+  /** small queue size currently yields incorrect 75% calculation */
+  public void testLowRefreshRateFalseShake_QueueSizeFive() {
+    final AtomicBoolean heardShake = new AtomicBoolean(false);
+    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
+      @Override public void hearShake() {
+        heardShake.set(true);
+      }
+    });
+
+    SensorEvent event = new SensorEvent(3);
+    
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, 70);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 70);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 15.8f, 70);
+
+    // This is not an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 15.8f, 70);
+
+    // This is not an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 15.8f, 70);
+
+    assertFalse("should not have heard shake", heardShake.get());
+
+  }
+
+  private void nextEvent(ShakeDetector detector, SensorEvent event, float x, float y, float z, int deltaMillis) {
+
+    event.values[0] = x;
+    event.values[1] = y;
+    event.values[2] = z;
+    event.timestamp += deltaMillis * 1000000;
+    detector.onSensorChanged(event);
   }
 
   public void testInitialShaking() {
@@ -72,41 +137,41 @@ public class ShakeDetectorTest extends TestCase {
     assertFalse("shaking", q.isShaking());
   }
 
-  /** Tests LG Ally sample rate. */
-  public void testShakingSampleCount3() {
-    ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
-
-    // These times approximate the data rate of the slowest device we've
-    // found, the LG Ally.
-    // on the LG Ally. The queue holds 500000000 ns (0.5ms) of samples or
-    // 4 samples, whichever is greater.
-    // 500000000
-    q.add(1000000000L, false);
-    q.add(1300000000L, false);
-    q.add(1600000000L, false);
-    q.add(1900000000L, false);
-    assertContent(q, false, false, false, false);
-    assertFalse("shaking", q.isShaking());
-
-    // The oldest two entries will be removed.
-    q.add(2200000000L, true);
-    q.add(2500000000L, true);
-    assertContent(q, false, false, true, true);
-    assertFalse("shaking", q.isShaking());
-
-    // Another entry should be removed, now 3 out of 4 are true.
-    q.add(2800000000L, true);
-    assertContent(q, false, true, true, true);
-    assertTrue("shaking", q.isShaking());
-
-    q.add(3100000000L, false);
-    assertContent(q, true, true, true, false);
-    assertTrue("shaking", q.isShaking());
-
-    q.add(3400000000L, false);
-    assertContent(q, true, true, false, false);
-    assertFalse("shaking", q.isShaking());
-  }
+//  /** Tests LG Ally sample rate. */
+//  public void testShakingSampleCount3() {
+//    ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
+//
+//    // These times approximate the data rate of the slowest device we've
+//    // found, the LG Ally.
+//    // on the LG Ally. The queue holds 500000000 ns (0.5ms) of samples or
+//    // 4 samples, whichever is greater.
+//    // 500000000
+//    q.add(1000000000L, false);
+//    q.add(1300000000L, false);
+//    q.add(1600000000L, false);
+//    q.add(1900000000L, false);
+//    assertContent(q, false, false, false, false);
+//    assertFalse("shaking", q.isShaking());
+//
+//    // The oldest two entries will be removed.
+//    q.add(2200000000L, true);
+//    q.add(2500000000L, true);
+//    assertContent(q, false, false, true, true);
+//    assertFalse("shaking", q.isShaking());
+//
+//    // Another entry should be removed, now 3 out of 4 are true.
+//    q.add(2800000000L, true);
+//    assertContent(q, false, true, true, true);
+//    assertTrue("shaking", q.isShaking());
+//
+//    q.add(3100000000L, false);
+//    assertContent(q, true, true, true, false);
+//    assertTrue("shaking", q.isShaking());
+//
+//    q.add(3400000000L, false);
+//    assertContent(q, true, true, false, false);
+//    assertFalse("shaking", q.isShaking());
+//  }
 
   private void assertContent(ShakeDetector.SampleQueue q, boolean... expected) {
     List<ShakeDetector.Sample> samples = q.asList();
