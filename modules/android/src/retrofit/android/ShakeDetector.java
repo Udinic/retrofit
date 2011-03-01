@@ -95,7 +95,7 @@ public class ShakeDetector implements SensorEventListener {
   }
 
   /** Queue of samples. Keeps a running average. */
-  static class SampleQueue {
+  private static class SampleQueue {
 
     /** Window size in ns. Used to compute the average. */
     private static final long MAX_WINDOW_SIZE = 500000000; // 0.5s
@@ -193,7 +193,7 @@ public class ShakeDetector implements SensorEventListener {
   }
 
   /** An accelerometer sample. */
-  static class Sample {
+  private static class Sample {
     /** Time sample was taken. */
     long timestamp;
 
@@ -205,7 +205,7 @@ public class ShakeDetector implements SensorEventListener {
   }
 
   /** Pools samples. Avoids garbage collection. */
-  static class SamplePool {
+  private static class SamplePool {
     private Sample head;
 
     /** Acquires a sample from the pool. */

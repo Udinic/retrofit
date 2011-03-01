@@ -8,59 +8,34 @@ import junit.framework.TestCase;
 
 /** @author Eric Burke (eric@squareup.com) */
 public class ShakeDetectorTest extends TestCase {
-  public void testBadAccelerometerAtRest() {
-    final AtomicBoolean heardShake = new AtomicBoolean();
-    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
+
+  private AtomicBoolean heardShake;
+  private ShakeDetector detector;
+  private SensorEvent event;
+
+  @Override protected void setUp() throws Exception {
+    super.setUp();
+    heardShake = new AtomicBoolean();
+    detector = new ShakeDetector(new ShakeDetector.Listener() {
       @Override public void hearShake() {
         heardShake.set(true);
       }
     });
+    event = new SensorEvent(3);
+  }
 
-    SensorEvent event = new SensorEvent(3);
-    event.values[0] = 10.11f;
-    event.values[1] =  0.08f;
-    event.values[2] = 18.34f;
+  public void testBadAccelerometerAtRest() {
 
     for (int i = 0; i < 200; i++) {
-      event.timestamp = i * 10000000;
-      detector.onSensorChanged(event);
+      nextEvent(detector, event, 10.11f, 0.08f, 18.34f, i*10);
     }
 
     assertFalse("should not have heard shake", heardShake.get());
-
   }
 
   public void testBadAccelerometerShaking() {
-    final AtomicBoolean heardShake = new AtomicBoolean();
-    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
-      @Override public void hearShake() {
-        heardShake.set(true);
-      }
-    });
-
-    SensorEvent event = new SensorEvent(3);
-    event.values[0] = 10.11f;
-    event.values[1] =  0.08f;
-    event.values[2] = 18.34f;
-
     for (int i = 0; i < 200; i++) {
-      event.timestamp = i * 10000000;
-
-      switch (i % 4) {
-        case 0:
-          event.values[0] = 10.11f;
-          break;
-        case 1:
-          event.values[0] = 0.11f;
-          break;
-        case 2:
-          event.values[0] = 18.11f;
-          break;
-        case 3:
-          event.values[0] = 28.11f;
-          break;
-      }
-      detector.onSensorChanged(event);
+      nextEvent(detector, event, (0.11f + 9*(i%4)), 0.08f, 18.34f, 10);
     }
 
     assertTrue("should have heard shake", heardShake.get());
@@ -68,14 +43,6 @@ public class ShakeDetectorTest extends TestCase {
 
   /** small queue size currently yields incorrect 75% calculation */
   public void testLowRefreshRateFalseShake_QueueSizeFour() {
-    final AtomicBoolean heardShake = new AtomicBoolean(false);
-    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
-      @Override public void hearShake() {
-        heardShake.set(true);
-      }
-    });
-
-    SensorEvent event = new SensorEvent(3);
 
     // This is an acceleration
     nextEvent(detector, event, 0.1f, 0.1f, 9.8f, 100);
@@ -90,20 +57,11 @@ public class ShakeDetectorTest extends TestCase {
     nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 100);
 
     assertFalse("should not have heard shake", heardShake.get());
-
   }
 
   /** small queue size currently yields incorrect 75% calculation */
   public void testLowRefreshRateFalseShake_QueueSizeFive() {
-    final AtomicBoolean heardShake = new AtomicBoolean(false);
-    ShakeDetector detector = new ShakeDetector(new ShakeDetector.Listener() {
-      @Override public void hearShake() {
-        heardShake.set(true);
-      }
-    });
 
-    SensorEvent event = new SensorEvent(3);
-    
     // This is an acceleration
     nextEvent(detector, event, 0.1f, 0.1f, 9.8f, 70);
 
@@ -120,11 +78,100 @@ public class ShakeDetectorTest extends TestCase {
     nextEvent(detector, event, 0.1f, 0.1f, 15.8f, 70);
 
     assertFalse("should not have heard shake", heardShake.get());
+  }
 
+  /**
+   * Low sampling rate (.2 sec), lots of false shake positives with
+   * old algorithm.
+   */
+  public void testShakingLgAlly(){
+    int sampleRate = 200; // 5 per second
+
+    // at rest
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    assertFalse("should not have heard shake", heardShake.get());
+
+    // shake vigorously
+    nextEvent(detector, event, 0.1f, 0.1f, 19.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 0.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 19.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 0.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 19.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 0.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 19.8f, sampleRate);
+    assertTrue("should have heard shake", heardShake.get());
+  }
+
+  /**
+   * Low sampling rate (.2 sec), lots of false shake positives with
+   * old algorithm.
+   */
+  public void xxxxtestShakingLgAlly_BackAndForthShake(){
+    int sampleRate = 200; // 5 per second
+
+    // at rest
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    assertFalse("should not have heard shake", heardShake.get());
+
+    // shake vigorously (no change in magnitude, only direction)
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    assertTrue("should have heard shake", heardShake.get());
+  }
+
+  /**
+   * Low sampling rate (.2 sec), lots of false shake positives with
+   * old algorithm.
+   */
+  public void xxxxtestShakingLgAlly_NoChangeInAccelerationMagnitude(){
+    int sampleRate = 200; // 5 per second
+
+    // at rest
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    assertFalse("should not have heard shake", heardShake.get());
+
+    // shake vigorously (no change in magnitude, only direction)
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 9.8f, 0.1f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, -9.8f, 0.1f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 9.8f, 0.1f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, -9.8f, 0.1f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    assertTrue("should have heard shake", heardShake.get());
+  }
+
+  public void testAllAccelerationsHeardAsShake() {
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, 200);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 12.8f, 200);
+
+    // This is an acceleration
+    nextEvent(detector, event, 0.1f, 0.1f, 15.8f, 200);
+
+    assertTrue("should have heard shake", heardShake.get());
   }
 
   private void nextEvent(ShakeDetector detector, SensorEvent event, float x, float y, float z, int deltaMillis) {
-
     event.values[0] = x;
     event.values[1] = y;
     event.values[2] = z;
@@ -132,69 +179,4 @@ public class ShakeDetectorTest extends TestCase {
     detector.onSensorChanged(event);
   }
 
-  public void testInitialShaking() {
-    ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
-    assertFalse("shaking", q.isShaking());
-  }
-
-//  /** Tests LG Ally sample rate. */
-//  public void testShakingSampleCount3() {
-//    ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
-//
-//    // These times approximate the data rate of the slowest device we've
-//    // found, the LG Ally.
-//    // on the LG Ally. The queue holds 500000000 ns (0.5ms) of samples or
-//    // 4 samples, whichever is greater.
-//    // 500000000
-//    q.add(1000000000L, false);
-//    q.add(1300000000L, false);
-//    q.add(1600000000L, false);
-//    q.add(1900000000L, false);
-//    assertContent(q, false, false, false, false);
-//    assertFalse("shaking", q.isShaking());
-//
-//    // The oldest two entries will be removed.
-//    q.add(2200000000L, true);
-//    q.add(2500000000L, true);
-//    assertContent(q, false, false, true, true);
-//    assertFalse("shaking", q.isShaking());
-//
-//    // Another entry should be removed, now 3 out of 4 are true.
-//    q.add(2800000000L, true);
-//    assertContent(q, false, true, true, true);
-//    assertTrue("shaking", q.isShaking());
-//
-//    q.add(3100000000L, false);
-//    assertContent(q, true, true, true, false);
-//    assertTrue("shaking", q.isShaking());
-//
-//    q.add(3400000000L, false);
-//    assertContent(q, true, true, false, false);
-//    assertFalse("shaking", q.isShaking());
-//  }
-
-  private void assertContent(ShakeDetector.SampleQueue q, boolean... expected) {
-    List<ShakeDetector.Sample> samples = q.asList();
-
-    StringBuilder sb = new StringBuilder();
-    for (ShakeDetector.Sample s : samples) {
-      sb.append(String.format("[%b,%d] ", s.accelerating, s.timestamp));
-    }
-
-    assertEquals(sb.toString(), expected.length, samples.size());
-    for (int i = 0; i < expected.length; i++) {
-      assertEquals("sample[" + i + "] accelerating",
-          expected[i], samples.get(i).accelerating);
-    }
-  }
-
-  public void testClear() {
-    ShakeDetector.SampleQueue q = new ShakeDetector.SampleQueue();
-    q.add(1000000000L, true);
-    q.add(1200000000L, true);
-    q.add(1400000000L, true);
-    assertTrue("shaking", q.isShaking());
-    q.clear();
-    assertFalse("shaking", q.isShaking());
-  }
 }
