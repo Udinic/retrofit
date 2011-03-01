@@ -110,7 +110,7 @@ public class ShakeDetectorTest extends TestCase {
    * Low sampling rate (.2 sec), lots of false shake positives with
    * old algorithm.
    */
-  public void xxxxtestShakingLgAlly_BackAndForthShake(){
+  public void testShakingLgAlly_BackAndForthShake(){
     int sampleRate = 200; // 5 per second
 
     // at rest
@@ -122,6 +122,9 @@ public class ShakeDetectorTest extends TestCase {
     assertFalse("should not have heard shake", heardShake.get());
 
     // shake vigorously (no change in magnitude, only direction)
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
+    nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
     nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
     nextEvent(detector, event, 0.1f, 0.1f, -9.8f, sampleRate);
     nextEvent(detector, event, 0.1f, 0.1f, 9.8f, sampleRate);
@@ -134,7 +137,7 @@ public class ShakeDetectorTest extends TestCase {
    * Low sampling rate (.2 sec), lots of false shake positives with
    * old algorithm.
    */
-  public void xxxxtestShakingLgAlly_NoChangeInAccelerationMagnitude(){
+  public void testShakingLgAlly_NoChangeInAccelerationMagnitude(){
     int sampleRate = 200; // 5 per second
 
     // at rest

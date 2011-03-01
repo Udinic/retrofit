@@ -18,11 +18,6 @@ import java.util.List;
  */
 public class ShakeDetector implements SensorEventListener {
 
-  /**
-   * When the magnitude of total acceleration exceeds this
-   * value, the phone is accelerating.
-   */
-  private static final int ACCELERATION_THRESHOLD = 1;
 
   /** Listens for shakes. */
   public interface Listener {
@@ -35,7 +30,7 @@ public class ShakeDetector implements SensorEventListener {
 
   private SensorManager sensorManager;
   private Sensor accelerometer;
-  private double lastMagnitude;
+  private AccelerationInfo lastAccelerationInfo = new AccelerationInfo();
 
   public ShakeDetector(Listener listener) {
     this.listener = listener;
@@ -83,15 +78,57 @@ public class ShakeDetector implements SensorEventListener {
 
   /** Returns true if the device is currently accelerating. */
   private boolean isAccelerating(SensorEvent event) {
-    float ax = event.values[0];
-    float ay = event.values[1];
-    float az = event.values[2];
-
-    final double magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
-//    System.out.println("magnitude is "+magnitude);
-    boolean accelerating = Math.abs(magnitude - lastMagnitude) > ACCELERATION_THRESHOLD;
-    lastMagnitude = magnitude;
+    AccelerationInfo info = new AccelerationInfo(event);
+    boolean accelerating = info.isAcceleration(lastAccelerationInfo);
+    lastAccelerationInfo = info;
     return accelerating;
+  }
+
+  private static class AccelerationInfo {
+    /**
+     * When the magnitude of total acceleration exceeds this
+     * value, the phone is accelerating.
+     */
+    private static final int MAGNITUDE_THRESHOLD = 1;
+
+    private static final float DIRECTION_THRESHOLD = 1.3f;
+
+    private final double accelerationMagnitude;
+    private final float ax;
+    private final float ay;
+    private final float az;
+
+    private AccelerationInfo(){
+      this.ax = 0;
+      this.ay = 0;
+      this.az = 0;
+      this.accelerationMagnitude = 0;
+    }
+
+    private AccelerationInfo(SensorEvent event) {
+      this.ax = event.values[0];
+      this.ay = event.values[1];
+      this.az = event.values[2];
+      this.accelerationMagnitude = Math.sqrt(ax * ax + ay * ay + az * az);
+    }
+
+    private boolean isAcceleration(AccelerationInfo other){
+      boolean accelerating = isMagnitudeChanged(other);
+      if (!accelerating){
+        accelerating = isDirectionChanged(other);
+      }
+      return accelerating;
+    }
+
+    private boolean isMagnitudeChanged(AccelerationInfo other) {
+      return Math.abs(accelerationMagnitude - other.accelerationMagnitude) > MAGNITUDE_THRESHOLD;
+    }
+
+    private boolean isDirectionChanged(AccelerationInfo other) {
+      return (Math.abs(this.ax - other.ax)) > DIRECTION_THRESHOLD
+          || (Math.abs(this.ay - other.ay)) > DIRECTION_THRESHOLD
+          || (Math.abs(this.az - other.az)) > DIRECTION_THRESHOLD;
+    }
   }
 
   /** Queue of samples. Keeps a running average. */
@@ -119,7 +156,7 @@ public class ShakeDetector implements SensorEventListener {
      * Adds a sample.
      *
      * @param timestamp    in nanoseconds of sample
-     * @param accelerating true if > {@link #ACCELERATION_THRESHOLD}.
+     * @param accelerating
      */
     void add(long timestamp, boolean accelerating) {
       // Purge samples that proceed window.
@@ -197,7 +234,6 @@ public class ShakeDetector implements SensorEventListener {
     /** Time sample was taken. */
     long timestamp;
 
-    /** If acceleration > {@link #ACCELERATION_THRESHOLD} */
     boolean accelerating;
 
     /** Next sample in the queue or pool. */
