@@ -86,14 +86,11 @@ public class ShakeDetector implements SensorEventListener {
 
   private static class AccelerationInfo {
     /**
-     * When the magnitude of total acceleration exceeds this
-     * value, the phone is accelerating.
+     * When the change in one of the acceleration components (x,y, or z)
+     * exceeds this value, the phone is accelerating.
      */
-    private static final int MAGNITUDE_THRESHOLD = 1;
-
     private static final float DIRECTION_THRESHOLD = 1.3f;
 
-    private final double accelerationMagnitude;
     private final float ax;
     private final float ay;
     private final float az;
@@ -102,33 +99,20 @@ public class ShakeDetector implements SensorEventListener {
       this.ax = 0;
       this.ay = 0;
       this.az = 0;
-      this.accelerationMagnitude = 0;
     }
 
     private AccelerationInfo(SensorEvent event) {
       this.ax = event.values[0];
       this.ay = event.values[1];
       this.az = event.values[2];
-      this.accelerationMagnitude = Math.sqrt(ax * ax + ay * ay + az * az);
     }
 
     private boolean isAcceleration(AccelerationInfo other){
-      boolean accelerating = isMagnitudeChanged(other);
-      if (!accelerating){
-        accelerating = isDirectionChanged(other);
-      }
-      return accelerating;
-    }
-
-    private boolean isMagnitudeChanged(AccelerationInfo other) {
-      return Math.abs(accelerationMagnitude - other.accelerationMagnitude) > MAGNITUDE_THRESHOLD;
-    }
-
-    private boolean isDirectionChanged(AccelerationInfo other) {
       return (Math.abs(this.ax - other.ax)) > DIRECTION_THRESHOLD
           || (Math.abs(this.ay - other.ay)) > DIRECTION_THRESHOLD
           || (Math.abs(this.az - other.az)) > DIRECTION_THRESHOLD;
     }
+
   }
 
   /** Queue of samples. Keeps a running average. */
