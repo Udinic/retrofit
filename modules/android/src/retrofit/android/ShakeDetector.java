@@ -69,8 +69,10 @@ public class ShakeDetector implements SensorEventListener {
   public void onSensorChanged(SensorEvent event) {
     boolean accelerating = isAccelerating(event);
     long timestamp = event.timestamp;
+    System.out.println(lastAccelerationInfo + "; accel from last? "+accelerating);
     queue.add(timestamp, accelerating);
     if (queue.isShaking()) {
+      System.out.println(" ... made a shake! with last "+queue.sampleCount);
       queue.clear();
       listener.hearShake();
     }
@@ -86,19 +88,22 @@ public class ShakeDetector implements SensorEventListener {
 
   private static class AccelerationInfo {
     /**
-     * When the change in one of the acceleration components (x,y, or z)
+     * When the change in one of the acceleration components (x, y, or z)
      * exceeds this value, the phone is accelerating.
      */
-    private static final float DIRECTION_THRESHOLD = 1.3f;
+    private static final float THRESHOLD = 1.3f;
 
     private final float ax;
     private final float ay;
     private final float az;
 
-    private AccelerationInfo(){
+    private double magnitude;
+
+    private AccelerationInfo() {
       this.ax = 0;
       this.ay = 0;
       this.az = 0;
+      this.magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
     }
 
     private AccelerationInfo(SensorEvent event) {
@@ -108,11 +113,21 @@ public class ShakeDetector implements SensorEventListener {
     }
 
     private boolean isAcceleration(AccelerationInfo other){
-      return (Math.abs(this.ax - other.ax)) > DIRECTION_THRESHOLD
-          || (Math.abs(this.ay - other.ay)) > DIRECTION_THRESHOLD
-          || (Math.abs(this.az - other.az)) > DIRECTION_THRESHOLD;
+      return Math.abs(this.ax - other.ax) > THRESHOLD
+          || Math.abs(this.ay - other.ay) > THRESHOLD
+          || Math.abs(this.az - other.az) > THRESHOLD
+          || Math.abs(this.magnitude - other.magnitude) > THRESHOLD;
     }
 
+    @Override
+    public String toString() {
+      return "AccelerationInfo{" +
+          "ax=" + ax +
+          ", ay=" + ay +
+          ", az=" + az +
+          ", magnitude=" + magnitude +
+          '}';
+    }
   }
 
   /** Queue of samples. Keeps a running average. */
