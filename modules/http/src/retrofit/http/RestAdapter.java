@@ -7,7 +7,6 @@ import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
@@ -34,9 +33,7 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.utils.URIUtils;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MIME;
 import org.apache.http.entity.mime.MultipartEntity;
-import org.apache.http.entity.mime.content.AbstractContentBody;
 import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.message.BasicNameValuePair;
 import retrofit.core.Callback;
@@ -454,46 +451,6 @@ import retrofit.io.TypedBytes;
       return new IllegalArgumentException(String.format(NOT_CALLBACK, method));
     }
 
-  }
-
-  /** Adapts ContentBody to TypedBytes. */
-  private static class TypedBytesBody extends AbstractContentBody {
-    private final TypedBytes typedBytes;
-    private final String name;
-
-    public TypedBytesBody(TypedBytes typedBytes, String baseName) {
-      super(typedBytes.mimeType().mimeName());
-      this.typedBytes = typedBytes;
-      this.name = baseName + "." + typedBytes.mimeType().extension();
-    }
-
-    public long getContentLength() {
-      return typedBytes.length();
-    }
-
-    public String getFilename() {
-      return name;
-    }
-
-    public String getCharset() {
-      return null;
-    }
-
-    public String getTransferEncoding() {
-      return MIME.ENC_BINARY;
-    }
-
-    @Override public void writeTo(OutputStream out) throws IOException {
-      /*
-       * Note: We probably want to differentiate I/O errors that occur
-       * while reading a file from network errors. Network operations can
-       * be retried. File operations will probably continue to fail.
-       *
-       * In the case of photo uploads, we at least check that the file
-       * exists before we even try to upload it.
-       */
-      typedBytes.writeTo(out);
-    }
   }
 
   /**
