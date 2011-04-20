@@ -1,14 +1,28 @@
 package retrofit.http;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonParseException;
 import com.google.inject.Binder;
 import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
-import org.apache.http.HttpEntity;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
@@ -28,25 +42,6 @@ import org.apache.http.message.BasicNameValuePair;
 import retrofit.core.Callback;
 import retrofit.core.MainThread;
 import retrofit.io.TypedBytes;
-
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Proxy;
-import java.lang.reflect.Type;
-import java.lang.reflect.WildcardType;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Executor;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Converts Java method calls to Rest calls.
@@ -498,49 +493,6 @@ import java.util.logging.Logger;
        * exists before we even try to upload it.
        */
       typedBytes.writeTo(out);
-    }
-  }
-
-  /**
-   * Converts JSON response to an object using Gson and then passes it to {@link
-   * Callback#call}.
-   */
-  static class GsonResponseHandler<T> extends CallbackResponseHandler<T> {
-
-    private final Type type;
-
-    GsonResponseHandler(Type type, UiCallback<T> callback) {
-      super(callback);
-      this.type = type;
-    }
-
-    static <T> GsonResponseHandler<T> create(Type type,
-        UiCallback<T> callback) {
-      return new GsonResponseHandler<T>(type, callback);
-    }
-
-    @Override protected T parse(HttpEntity entity) throws IOException,
-        ServerException {
-      try {
-        if (logger.isLoggable(Level.FINE)) {
-          entity = HttpClients.copyAndLog(entity);
-        }
-
-        // TODO: Use specified encoding.
-        InputStreamReader in = new InputStreamReader(entity.getContent(),
-            "UTF-8");
-
-        /*
-         * It technically isn't safe for fromJson() to return T here.
-         * We derived type from Callback<T>, so we know we're safe.
-         */
-        @SuppressWarnings("unchecked")
-        T t = (T) new Gson().fromJson(in, type);
-        return t;
-      } catch (JsonParseException e) {
-        // The server returned us bad JSON!
-        throw new ServerException(e);
-      }
     }
   }
 
