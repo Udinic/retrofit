@@ -14,7 +14,7 @@ public class Server {
   private final String webUrl;
   private final boolean ignoreSslWarnings;
 
-  Server(String apiUrl, String webUrl, boolean ignoreSslWarnings) {
+  protected Server(String apiUrl, String webUrl, boolean ignoreSslWarnings) {
     this.apiUrl = apiUrl;
     this.webUrl = webUrl;
     this.ignoreSslWarnings = ignoreSslWarnings;
