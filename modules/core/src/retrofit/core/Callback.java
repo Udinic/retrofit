@@ -32,6 +32,8 @@ public interface Callback<T> {
   /**
    * The server returned a client error. In most cases, this is a programming
    * error, but it can also signify a user input error.
+   *
+   * @return response object or null if server returned an empty response.
    */
   void clientError(T response);
 
